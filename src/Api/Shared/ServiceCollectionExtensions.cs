@@ -15,6 +15,7 @@ using MediatR;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
 
@@ -79,6 +80,10 @@ public static class ServiceCollectionExtensions
             options.AddPolicy(Policies.BusinessOwner, policy => policy.Requirements.Add(new BusinessOwnerRequirement()));
             options.AddPolicy(Policies.BusinessAdminOrOwner, policy => policy.Requirements.Add(new BusinessAdminOrOwnerRequirement()));
         });
+
+        services.AddHealthChecks()
+            .AddCheck("self", () => HealthCheckResult.Healthy())
+            .AddDbContextCheck<AppDbContext>("db");
 
         services.AddEndpointsApiExplorer();
         services.AddOpenApi();

@@ -28,6 +28,7 @@ public sealed class AuthService(
         var user = new User(Guid.NewGuid(), request.Email, passwordHasher.Hash(request.Password), false, now);
         db.Users.Add(user);
 
+        await RevokeAllActiveRefreshTokens(user.Id, ct);
         var refresh = CreateRefreshToken(user.Id, now);
         db.RefreshTokens.Add(refresh.Entity);
 
@@ -48,6 +49,7 @@ public sealed class AuthService(
             return Result<AuthResponse>.Failure(new Error("auth.invalid_credentials", "Credenciales inválidas"));
 
         var now = DateTimeOffset.UtcNow;
+        await RevokeAllActiveRefreshTokens(user.Id, ct);
         var refresh = CreateRefreshToken(user.Id, now);
         db.RefreshTokens.Add(refresh.Entity);
 
@@ -110,5 +112,18 @@ public sealed class AuthService(
         var hash = tokenHasher.Hash(plain);
         var entity = new RefreshToken(Guid.NewGuid(), userId, hash, now.AddDays(_jwt.RefreshTokenDays), now, null);
         return (entity, plain);
+    }
+
+    private async Task RevokeAllActiveRefreshTokens(Guid userId, CancellationToken ct)
+    {
+        var now = DateTimeOffset.UtcNow;
+        var tokens = await db.RefreshTokens
+            .Where(t => t.UserId == userId && t.RevokedAt == null && t.ExpiresAt > now)
+            .ToListAsync(ct);
+
+        foreach (var t in tokens)
+        {
+            t.Revoke(DateTimeOffset.UtcNow);
+        }
     }
 }
